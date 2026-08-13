@@ -290,9 +290,9 @@ def interface_repetition_one_macro_table() -> pd.DataFrame:
             },
             {
                 "macro-tick": "B",
-                "only operation family shown": "color-ancilla Bell preparation",
-                "checks / actions": "prepare the 0145, 0235, and 0246 two-ancilla pairs",
-                "relation to executable schedule": "One conceptual preparation group.",
+                "only operation family shown": "color-ancilla Bell-pair preparation",
+                "checks / actions": "prepare only the 0145, 0235, and 0246 two-ancilla pairs",
+                "relation to executable schedule": "The q2/q2′ gadget is not part of this Bell-pair panel.",
             },
             {
                 "macro-tick": "Z",
@@ -313,8 +313,19 @@ def interface_repetition_one_macro_table() -> pd.DataFrame:
             {
                 "macro-tick": "M",
                 "only operation family shown": "color-ancilla disentangling/readout",
-                "checks / actions": "MX/MZ ancilla readouts and postselected color detectors",
+                "checks / actions": "MX/MZ color readouts only",
                 "relation to executable schedule": "Readouts are staggered by the released pipeline.",
+            },
+            {
+                "macro-tick": "C",
+                "only operation family shown": "exact q2/q2′ repetition-code conversion route",
+                "checks / actions": (
+                    "RZ 2′; form ZZ=+1; route the two Z contributions; move data to 2′; "
+                    "RX 2; form XX=+1; route the two X contributions; return data to 2; MX 2′"
+                ),
+                "relation to executable schedule": (
+                    "Direct q2/q2′ operations appear only in C. Outlined Z/X entries refer to arrows drawn once in those panels."
+                ),
             },
         ]
     )
@@ -330,7 +341,11 @@ def hirano_interface_round_macro_table(round_number: int) -> pd.DataFrame:
         families = [
             ("I", "interface ZZ checks", "Z1a (left site), Z35bc, Zde"),
             ("S", "compatible surface checks", "all ordinary surface X/Z checks except top Xab/Xcd"),
-            ("B", "color-ancilla Bell preparation", "prepare 0145, 0235, and 0246 pairs for the second direct color extraction"),
+            (
+                "B",
+                "color-pair preparation and fresh 2/2′ copy",
+                "prepare 0145, 0235, and 0246 pairs; RZ 2′ and CX 2→2′ for the second extraction",
+            ),
             ("Z", "Steane Z-check coupling", "Z0145, Z0235, Z0246"),
             ("X", "Steane X-check coupling", "none in the second direct color extraction"),
             ("M", "color-ancilla disentangling/readout", "MX/MZ readouts; retain the direct Z-check results"),
@@ -342,7 +357,6 @@ def hirano_interface_round_macro_table(round_number: int) -> pd.DataFrame:
             ("D", "Steane demolition", "destructively MX-measure Steane data 0–6 (with temporary 2′ bookkeeping)"),
             ("A", "demolition Xab ancilla", "RX q23; CX q23→a,b; MX q23"),
             ("P", "derive color-X checks", "X0145ab, X0235, X0246 and logical XL from demolition parities"),
-            ("R", "recover top surface-X checks", "restart Xab and Xcd in the post-merge surface record"),
         ]
     else:
         raise ValueError("round_number must be 1, 2, or 3")
@@ -362,6 +376,8 @@ def hirano_interface_round_macro_table(round_number: int) -> pd.DataFrame:
 def plot_grouped_hirano_interface_round(
     wrapper: SteanePlusSurfaceCode,
     round_number: int,
+    *,
+    detector_overlay: bool = False,
 ) -> plt.Figure:
     """Plot one Hirano lattice-surgery round as conceptual operation groups.
 
@@ -411,7 +427,15 @@ def plot_grouped_hirano_interface_round(
     ]
     check_colors = {"0145": "#d1495b", "0235": "#2b6cb0", "0246": "#6a4c93"}
 
-    fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+    if round_number == 1:
+        fig, axes = plt.subplots(2, 4, figsize=(24, 12))
+        grid = axes[0, 3].get_subplotspec().get_gridspec()
+        axes[0, 3].remove()
+        axes[1, 3].remove()
+        q2_route_axis = fig.add_subplot(grid[:, 3])
+    else:
+        fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+        q2_route_axis = None
 
     def setup_axis(ax: plt.Axes, title: str, *, surface: bool = False) -> None:
         ax.set_title(title, fontsize=12, fontweight="bold")
@@ -505,6 +529,42 @@ def plot_grouped_hirano_interface_round(
         ax.scatter(*coord, marker="s", s=46, color=color, edgecolor="white", zorder=5)
         ax.text(coord[0], coord[1], kind, fontsize=7, ha="center", va="center", zorder=6)
     ax.text(5, 15.2, "top Xab and Xcd checks removed during merge", ha="center", fontsize=8, color="#a33")
+    if detector_overlay:
+        detector_text = {
+            1: "q24: m29\nD16 = m5 ⊕ m29\n(start D46)",
+            2: "q24: m61\nD46 = m29 ⊕ m61\n(start D77)",
+            3: "q24: m100\nD77 = m61 ⊕ m100",
+        }[round_number]
+        ax.scatter(2, 18, s=260, facecolor="none", edgecolor="#111111", linewidth=3, zorder=9)
+        ax.annotate(
+            detector_text,
+            (2, 18),
+            xytext=(28, 15),
+            textcoords="offset points",
+            fontsize=9,
+            fontweight="bold",
+            color="#111111",
+            arrowprops={"arrowstyle": "->", "color": "#111111", "lw": 1.5},
+        )
+        if round_number in (1, 2):
+            history_label = "A1: X after q24 RZ" if round_number == 1 else "A2: X after q24 RZ"
+            ax.scatter(2, 18, s=80, marker="*", color="#dc2626", zorder=10)
+            ax.annotate(history_label, (2, 18), xytext=(30, -35), textcoords="offset points", fontsize=8.5, color="#b91c1c", fontweight="bold")
+
+    if detector_overlay and round_number == 3:
+        # Competing zero-probe history B has an X component on surface data a
+        # after the interface CX a -> q23.
+        ax = axes[0, 0]
+        ax.scatter(1, 17, s=100, marker="*", color="#dc2626", zorder=10)
+        ax.annotate(
+            "B2: X on a after\nCX a→q23",
+            (1, 17),
+            xytext=(18, -38),
+            textcoords="offset points",
+            fontsize=8.5,
+            color="#b91c1c",
+            fontweight="bold",
+        )
 
     if round_number == 3:
         # D: destructive X measurement of the Steane/color data.
@@ -566,44 +626,60 @@ def plot_grouped_hirano_interface_round(
         ax.text(0.5, 0.58, parity_text, transform=ax.transAxes, ha="center", va="center", fontsize=15)
         ax.text(0.5, 0.14, "The first three parities are postselected.", transform=ax.transAxes, ha="center", fontsize=10)
 
-        # R: post-merge recovery of the two top surface-X checks.
+        # The sixth grid cell is deliberately empty. Recovery is drawn only
+        # in the post-interface atlas, so no recovery operation is duplicated.
         ax = axes[1, 2]
-        setup_axis(ax, "Macro-tick R — recover top X checks only")
-        draw_data(ax)
-        for ancilla, support, name in [
-            ((2, 16), [(1, 17), (3, 17)], "Xab (q23)"),
-            ((6, 16), [(5, 17), (7, 17)], "Xcd (q53)"),
-        ]:
-            ax.scatter(*ancilla, marker="P", s=160, color="#ef767a", edgecolor="white", zorder=6)
-            ax.annotate(name, ancilla, xytext=(-12, 15), textcoords="offset points", fontsize=9, fontweight="bold")
-            for data in support:
-                ax.annotate(
-                    "",
-                    xy=data,
-                    xytext=ancilla,
-                    arrowprops={
-                        "arrowstyle": "-|>",
-                        "color": "#c2415d",
-                        "lw": 3,
-                        "mutation_scale": 25,
-                        "shrinkA": 9,
-                        "shrinkB": 8,
-                    },
-                )
-        ax.text(5, 17.9, "surface-X ancilla controls → data targets", ha="center", fontsize=9)
+        ax.axis("off")
+        ax.set_title("End of interface round 3", fontsize=12, fontweight="bold")
+        ax.text(
+            0.5,
+            0.60,
+            "No operation is assigned to this panel.",
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=14,
+            fontweight="bold",
+        )
+        ax.text(
+            0.5,
+            0.36,
+            "The next physical operations appear only in\n"
+            "post-interface macro-tick R1 below.",
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=12,
+        )
+        ax.text(
+            0.5,
+            0.12,
+            "Empty by design: prevents duplicating the recovery circuit.",
+            transform=ax.transAxes,
+            ha="center",
+            fontsize=10,
+            color="#555555",
+        )
 
         fig.suptitle(
             "Hirano interface round 3, barrier-collapsed conceptual macro-ticks\n"
-            "This round ends with Steane demolition and recovery of the surface top edge.",
+            "This round ends with Steane demolition; surface recovery follows afterward.",
             fontsize=15,
             fontweight="bold",
         )
         fig.tight_layout(rect=(0, 0, 1, 0.94))
         return fig
 
-    # B: Bell-pair preparation, without data couplings.
+    # B owns only the three genuine color-ancilla Bell-pair preparations.
+    # The encoded-data q2/q2' route is kept separate in C below because it
+    # alternates Z- and X-repetition encodings; it is not a Bell ancilla.
     ax = axes[0, 2]
-    setup_axis(ax, "Macro-tick B — prepare color Bell pairs only")
+    setup_axis(
+        ax,
+        "Macro-tick B — color Bell-pair preparation only"
+        if round_number == 1
+        else "Macro-tick B — color pairs + fresh q2/q2′ Z-copy",
+    )
     draw_data(ax)
     draw_color_ancillas(ax)
     for a, b, name in color_pairs:
@@ -622,7 +698,38 @@ def plot_grouped_hirano_interface_round(
         )
         midpoint = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
         ax.annotate("CX", midpoint, xytext=(3, -10), textcoords="offset points", fontsize=8)
-    ax.text(5, 17.7, "A: RX / later MX     B: RZ / later MZ", ha="center", fontsize=9)
+    if round_number == 2:
+        ax.annotate(
+            "",
+            xy=(5, 11),
+            xytext=(6, 12),
+            arrowprops={
+                "arrowstyle": "-|>",
+                "color": "#00897b",
+                "lw": 3,
+                "mutation_scale": 25,
+                "shrinkA": 8,
+                "shrinkB": 8,
+            },
+        )
+        ax.annotate(
+            "RZ 2′; CX 2→2′\nfresh copy for extraction 2",
+            (5.5, 11.5),
+            xytext=(10, -3),
+            textcoords="offset points",
+            fontsize=8,
+            color="#00695c",
+            fontweight="bold",
+        )
+    ax.text(
+        5,
+        17.7,
+        "A: RX / later MX     B: RZ / later MZ"
+        if round_number == 1
+        else "Color pairs plus source's fresh RZ 2′; CX 2→2′",
+        ha="center",
+        fontsize=9,
+    )
 
     # Z: collect all data-to-ancilla couplings.
     ax = axes[1, 0]
@@ -645,6 +752,21 @@ def plot_grouped_hirano_interface_round(
             },
         )
     ax.text(5, 17.7, "Z0145 (red), Z0235 (blue), Z0246 (purple)", ha="center", fontsize=9)
+    if round_number == 1:
+        ax.annotate(
+            "q2 → 0235-B",
+            (5.5, 12.6),
+            fontsize=8.5,
+            color=check_colors["0235"],
+            fontweight="bold",
+        )
+        ax.annotate(
+            "q2′ → 0246-B",
+            (4.2, 11.35),
+            fontsize=8.5,
+            color=check_colors["0246"],
+            fontweight="bold",
+        )
 
     # X: collect all ancilla-to-data couplings; X0145 is intentionally absent.
     ax = axes[1, 1]
@@ -670,6 +792,20 @@ def plot_grouped_hirano_interface_round(
         ax.plot([0.8, 2.3], [12.8, 14.2], color="#555555", linestyle="--", linewidth=1.8)
         ax.text(0.7, 12.2, "X0145 omitted", fontsize=9, color="#555555")
         ax.text(5, 17.7, "X0235 (blue), X0246 (purple)", ha="center", fontsize=9)
+        ax.annotate(
+            "0235-B → q2",
+            (5.35, 12.7),
+            fontsize=8.5,
+            color=check_colors["0235"],
+            fontweight="bold",
+        )
+        ax.annotate(
+            "0246-B → q2′",
+            (4.05, 11.25),
+            fontsize=8.5,
+            color=check_colors["0246"],
+            fontweight="bold",
+        )
     else:
         ax.text(
             5,
@@ -685,13 +821,33 @@ def plot_grouped_hirano_interface_round(
 
     # M: show readout bases and the staggered/pipelined nature of the record.
     ax = axes[1, 2]
-    setup_axis(ax, "Macro-tick M — disentangle/read out only")
+    setup_axis(
+        ax,
+        "Macro-tick M — color-pair disentangle/readout only"
+        if round_number == 1
+        else "Macro-tick M — disentangle/read out only",
+    )
     draw_data(ax)
     draw_color_ancillas(ax)
     for a, b, name in color_pairs:
         ax.annotate("MX", a, xytext=(-8, 13), textcoords="offset points", fontsize=9, fontweight="bold")
         ax.annotate("MZ", b, xytext=(5, -15), textcoords="offset points", fontsize=9, fontweight="bold")
-        ax.plot([a[0], b[0]], [a[1], b[1]], color=check_colors[name], linewidth=2, alpha=0.65)
+        ax.annotate(
+            "",
+            xy=b,
+            xytext=a,
+            arrowprops={
+                "arrowstyle": "-|>",
+                "color": check_colors[name],
+                "lw": 2.8,
+                "alpha": 0.85,
+                "mutation_scale": 24,
+                "shrinkA": 8,
+                "shrinkB": 8,
+            },
+        )
+        midpoint = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+        ax.annotate("CX", midpoint, xytext=(3, -10), textcoords="offset points", fontsize=8)
     ax.text(
         5,
         17.35,
@@ -705,9 +861,92 @@ def plot_grouped_hirano_interface_round(
         fontsize=8.5,
     )
 
+    if round_number == 1:
+        assert q2_route_axis is not None
+        q2_route_axis.axis("off")
+        q2_route_axis.set_title(
+            "Macro-tick C — exact q2/q2′ Z→X repetition route",
+            fontsize=12,
+            fontweight="bold",
+        )
+        q2_route_axis.text(
+            0.5,
+            0.965,
+            "top → bottom is exact source order",
+            transform=q2_route_axis.transAxes,
+            ha="center",
+            va="top",
+            fontsize=9,
+            color="#444444",
+        )
+        route = [
+            ("RZ 2′", "gate"),
+            ("CX 2→2′   ⇒   ZZ=+1\nZ2 and Z2′ carry the same Z information", "state"),
+            ("Z panel:  q2→0235-B", "reference_z"),
+            ("CX 2′→2   ⇒   encoded data moves to q2′", "gate"),
+            ("Z panel:  q2′→0246-B", "reference_z"),
+            ("RX 2   ⇒   |+⟩₂ |ψ⟩₂′", "gate"),
+            ("X panel:  0246-B→q2′", "reference_x"),
+            ("CX 2→2′   ⇒   XX=+1\nX2 and X2′ carry the same X information", "state"),
+            ("X panel:  0235-B→q2", "reference_x"),
+            ("CX 2′→2   ⇒   data returns to q2; q2′=|+⟩", "gate"),
+            ("MX 2′   (postselect +1)", "gate"),
+        ]
+        colors = {
+            "gate": ("#e6fffa", "#00897b"),
+            "state": ("#ccfbf1", "#00695c"),
+            "reference_z": ("#f8fafc", "#475569"),
+            "reference_x": ("#f8fafc", "#475569"),
+        }
+        y_values = np.linspace(0.89, 0.13, len(route))
+        for index, ((label, kind), y) in enumerate(zip(route, y_values)):
+            facecolor, edgecolor = colors[kind]
+            linestyle = "--" if kind.startswith("reference") else "-"
+            q2_route_axis.text(
+                0.5,
+                y,
+                label,
+                transform=q2_route_axis.transAxes,
+                ha="center",
+                va="center",
+                fontsize=8.6 if "\n" not in label else 8.1,
+                fontweight="bold" if kind in {"state", "reference_z", "reference_x"} else "normal",
+                color=(check_colors["0235"] if "0235" in label else check_colors["0246"] if "0246" in label else "#173b57"),
+                bbox={
+                    "boxstyle": "round,pad=0.34",
+                    "facecolor": facecolor,
+                    "edgecolor": edgecolor,
+                    "linestyle": linestyle,
+                    "linewidth": 1.5,
+                },
+            )
+            if index + 1 < len(route):
+                q2_route_axis.annotate(
+                    "",
+                    xy=(0.5, y_values[index + 1] + 0.024),
+                    xytext=(0.5, y - 0.027),
+                    xycoords=q2_route_axis.transAxes,
+                    arrowprops={"arrowstyle": "-|>", "lw": 1.5, "color": "#64748b", "mutation_scale": 15},
+                )
+        q2_route_axis.text(
+            0.5,
+            0.055,
+            "Dashed boxes are cross-references, not duplicate gates:\n"
+            "their CNOT arrows appear once in macro Z or X.",
+            transform=q2_route_axis.transAxes,
+            ha="center",
+            va="center",
+            fontsize=8.7,
+            color="#555555",
+        )
+
     fig.suptitle(
         f"Hirano interface round {round_number}, barrier-collapsed conceptual macro-ticks\n"
-        "Each panel contains one operation family; panels are not executable hardware TICKs.",
+        + (
+            "I/S belong to merged-boundary round 1; B/Z/X/M/C own logical color extraction 1, which is source-pipelined."
+            if round_number == 1
+            else "Each panel contains one operation family; panels are not executable hardware TICKs."
+        ),
         fontsize=15,
         fontweight="bold",
     )
@@ -720,6 +959,761 @@ def plot_grouped_interface_repetition_one(
 ) -> plt.Figure:
     """Backward-compatible name for the round-1 grouped plot."""
     return plot_grouped_hirano_interface_round(wrapper, 1)
+
+
+def q2_prime_lifecycle_table() -> pd.DataFrame:
+    """Exact q2/q2' gates in released ZXZ source order."""
+    return pd.DataFrame(
+        [
+            (1, "first Z→X extraction", "RZ 2′", 1380, "initialize the temporary site"),
+            (2, "first Z→X extraction", "CX 2→2′", 1395, "first half of moving encoded data to 2′"),
+            (3, "first Z→X extraction", "CX 2′→2", 1426, "complete the move to 2′"),
+            (4, "first Z→X extraction", "RX 2", 1442, "prepare released site 2 for X-check couplings"),
+            (5, "first Z→X extraction", "CX 2→2′", 1478, "first half of moving encoded data back to 2"),
+            (6, "first Z→X extraction", "CX 2′→2", 1510, "complete the move back to 2"),
+            (7, "first Z→X extraction", "MX 2′ + detector", 1530, "check/postselect the released temporary site"),
+            (8, "second Z extraction", "RZ 2′", 1552, "fresh temporary-site initialization"),
+            (9, "second Z extraction", "CX 2→2′", 1574, "copy X-error information for the second extraction"),
+            (10, "demolition", "MX 2", 1635, "destructive data outcome"),
+            (11, "demolition", "MX 2′", 1636, "destructive temporary-copy outcome"),
+        ],
+        columns=["order", "logical owner", "released-code operation", "source line", "role"],
+    )
+
+
+def q2_prime_emitted_sequence(wrapper: SteanePlusSurfaceCode) -> list[str]:
+    """Extract q2/q2' resets, readouts, and mutual CXs from emitted Stim."""
+    ids = qubit_id_by_coord(wrapper)
+    q2 = ids[(6, 12)]
+    q2_prime = ids[(5, 11)]
+    name = {q2: "2", q2_prime: "2′"}
+    result: list[str] = []
+    for instruction in wrapper.circuit.circuit.flattened():
+        targets = instruction.targets_copy()
+        if instruction.name == "CX":
+            for control, target in zip(targets[::2], targets[1::2]):
+                if {control.qubit_value, target.qubit_value} == {q2, q2_prime}:
+                    result.append(f"CX {name[control.qubit_value]}→{name[target.qubit_value]}")
+        elif instruction.name in {"R", "RX", "M", "MX"}:
+            for target in targets:
+                if target.qubit_value in name:
+                    gate = "RZ" if instruction.name == "R" else instruction.name
+                    result.append(f"{gate} {name[target.qubit_value]}")
+    return result
+
+
+def emitted_operation_census(wrapper: SteanePlusSurfaceCode) -> pd.DataFrame:
+    """Count primitive operations in the noiseless emitted Stim circuit.
+
+    Batched quantum instructions are counted per target (or per target pair
+    for two-qubit gates); DETECTOR and OBSERVABLE_INCLUDE are counted per
+    instruction. Coordinate declarations and TICK separators are excluded.
+    """
+    counts: dict[str, int] = {}
+    two_qubit = {"CX", "CY", "CZ", "SWAP", "ISWAP", "XCX", "XCY", "XCZ", "YCX", "YCY", "YCZ"}
+    classical = {"DETECTOR", "OBSERVABLE_INCLUDE", "SHIFT_COORDS"}
+    for instruction in wrapper.circuit.circuit.flattened():
+        name = instruction.name
+        if name in {"QUBIT_COORDS", "TICK"}:
+            continue
+        targets = instruction.targets_copy()
+        if name in two_qubit:
+            amount = len(targets) // 2
+        elif name in classical:
+            amount = 1
+        else:
+            amount = sum(
+                target.is_qubit_target
+                or target.is_x_target
+                or target.is_y_target
+                or target.is_z_target
+                for target in targets
+            )
+            amount = amount or 1
+        counts[name] = counts.get(name, 0) + amount
+    family = {
+        "R": "quantum reset",
+        "RX": "quantum reset",
+        "RY": "quantum reset",
+        "CX": "quantum two-qubit gate",
+        "M": "quantum measurement",
+        "MX": "quantum measurement",
+        "MY": "quantum measurement",
+        "DETECTOR": "classical record annotation",
+        "OBSERVABLE_INCLUDE": "classical record annotation",
+    }
+    return pd.DataFrame(
+        [
+            {"Stim operation": name, "primitive count": count, "kind": family.get(name, "other")}
+            for name, count in sorted(counts.items())
+        ]
+    )
+
+
+def plot_q2_prime_exact_lifecycle() -> plt.Figure:
+    """Circuit-like strip of every direct q2/q2' operation in source order."""
+    operations = [
+        (1, "RZ", "2′", None),
+        (2, "CX", "2", "2′"),
+        (3, "CX", "2′", "2"),
+        (4, "RX", "2", None),
+        (5, "CX", "2", "2′"),
+        (6, "CX", "2′", "2"),
+        (7, "MX", "2′", None),
+        (8, "RZ", "2′", None),
+        (9, "CX", "2", "2′"),
+        (10, "MX", "2", None),
+        (11, "MX", "2′", None),
+    ]
+    ypos = {"2": 1.0, "2′": 0.0}
+    fig, ax = plt.subplots(figsize=(18, 5.2))
+    ax.axvspan(0.5, 7.5, color="#e0f2fe", alpha=0.55)
+    ax.axvspan(7.5, 9.5, color="#fef3c7", alpha=0.65)
+    ax.axvspan(9.5, 11.5, color="#fce7f3", alpha=0.65)
+    for name, y in ypos.items():
+        ax.hlines(y, 0.5, 11.5, color="#334155", linewidth=2)
+        ax.text(0.25, y, f"q{name}", ha="right", va="center", fontsize=13, fontweight="bold")
+    for x, gate, first, second in operations:
+        if gate == "CX":
+            yc, yt = ypos[first], ypos[second]
+            ax.scatter(x, yc, s=70, color="#00695c", zorder=5)
+            ax.annotate(
+                "",
+                xy=(x, yt),
+                xytext=(x, yc),
+                arrowprops={"arrowstyle": "-|>", "color": "#00897b", "lw": 2.8, "mutation_scale": 22, "shrinkA": 5, "shrinkB": 5},
+                zorder=4,
+            )
+            ax.text(x, 1.31, f"{x}. CX {first}→{second}", rotation=38, ha="left", va="bottom", fontsize=8.5)
+        else:
+            y = ypos[first]
+            marker = "s" if gate.startswith("R") else "D"
+            color = "#2563eb" if gate.startswith("R") else "#be123c"
+            ax.scatter(x, y, s=105, marker=marker, color=color, edgecolor="white", zorder=5)
+            ax.text(x, y + (0.20 if y == 1 else -0.22), gate, ha="center", va="center", fontsize=9, fontweight="bold", color=color)
+            ax.text(x, 1.31, f"{x}. {gate} {first}", rotation=38, ha="left", va="bottom", fontsize=8.5)
+    ax.axvline(7.5, color="#777777", linestyle="--", linewidth=1.4)
+    ax.axvline(9.5, color="#777777", linestyle="--", linewidth=1.4)
+    ax.text(4, -0.62, "first Z→X extraction: move out, move back, then check 2′", ha="center", fontsize=11, fontweight="bold")
+    ax.text(8.5, -0.62, "second Z extraction:\nfresh copy", ha="center", fontsize=10, fontweight="bold")
+    ax.text(10.5, -0.62, "demolition:\nmeasure both", ha="center", fontsize=10, fontweight="bold")
+    ax.text(
+        6,
+        -1.02,
+        "Exact released-code q2/q2′ gates. Intervening couplings to color ancillas are shown in the Z/X macro panels.",
+        ha="center",
+        fontsize=10,
+        color="#444444",
+    )
+    ax.set_xlim(0, 12)
+    ax.set_ylim(-1.2, 2.05)
+    ax.axis("off")
+    ax.text(
+        6,
+        1.89,
+        "Optimization candidate only: any fusion must preserve the intermediate MX detector and be re-audited for faults.",
+        ha="center",
+        fontsize=9.5,
+        color="#9f1239",
+        fontweight="bold",
+    )
+    ax.set_title("Exact ZXZ-generator q2/q2′ lifecycle (no CNOT cancellation applied)", fontsize=15, fontweight="bold")
+    fig.tight_layout()
+    return fig
+
+
+def pre_interface_macro_table(probe: str = "+") -> pd.DataFrame:
+    """Non-overlapping conceptual attribution before interface round 1."""
+    if probe not in ("+", "0"):
+        raise ValueError("probe must be '+' or '0'")
+    steane_state = "perfect |+_L> Steane preparation" if probe == "+" else "perfect |0_L> Steane preparation"
+    return pd.DataFrame(
+        [
+            ("P", "surface-data preparation", "RX all 25 distance-5 surface data qubits"),
+            (
+                "S0",
+                "initial full surface-syndrome round",
+                "prepare all 24 check ancillas, couple each support, and read them out",
+            ),
+            (
+                "D0",
+                "initial surface detector boundary",
+                "emit single-outcome detectors for initially satisfied X checks; retain Z outcomes as baselines",
+            ),
+            ("C", "Steane preparation", f"{steane_state}; internal code-expansion encoder is collapsed"),
+            (
+                "T",
+                "merge transition",
+                "pause top checks Xab and Xcd before starting the merged-boundary measurements",
+            ),
+        ],
+        columns=["macro-tick", "only operation family shown", "checks / actions"],
+    )
+
+
+def post_interface_macro_table(
+    *,
+    probe: str = "+",
+    full_post_selection: bool = False,
+) -> pd.DataFrame:
+    """Non-overlapping conceptual attribution after interface round 3."""
+    if probe not in ("+", "0"):
+        raise ValueError("probe must be '+' or '0'")
+    final_basis = "MX" if probe == "+" else "MZ"
+    closed_family = "surface-X" if probe == "+" else "surface-Z"
+    observable = (
+        "first surface column in X plus Steane demolition m1,m4,m6"
+        if probe == "+"
+        else "top surface row in Z plus final interface ZZ outcomes"
+    )
+    rows = [
+        (
+            "R1",
+            "first post-interface surface round",
+            "restore Xab/Xcd and measure one complete 24-check surface round",
+        ),
+        (
+            "D1",
+            "recovery detector relations",
+            "compare demolition Xab to recovered Xab; seed Xcd; compare all continuing checks in time",
+        ),
+    ]
+    if not full_post_selection:
+        rows.append(
+            (
+                "R2–R5",
+                "four decoded surface rounds",
+                "repeat the complete 24-check surface round four times, producing temporal detectors",
+            )
+        )
+    rows.extend(
+        [
+            ("M", "final destructive surface readout", f"{final_basis} all 25 surface data qubits"),
+            (
+                "F",
+                "classical end-cap comparison",
+                f"no gates: XOR each stored final {closed_family}-check bit with the matching data parity recorded in M",
+            ),
+            ("L0", "logical observable parity", observable),
+        ]
+    )
+    return pd.DataFrame(rows, columns=["macro-tick", "only operation family shown", "checks / actions"])
+
+
+def _macro_surface_data(
+    wrapper: SteanePlusSurfaceCode,
+) -> dict[tuple[int, int], str]:
+    return {
+        (wrapper.surface_offset_x + 2 * col, wrapper.surface_offset_y + 2 * row):
+            (surface_data_label((wrapper.surface_offset_x + 2 * col, wrapper.surface_offset_y + 2 * row)) or "")
+            .removeprefix("Su-")
+        for row in range(wrapper.surface_distance)
+        for col in range(wrapper.surface_distance)
+    }
+
+
+def _setup_macro_surface_axis(ax: plt.Axes, title: str) -> None:
+    ax.set_title(title, fontsize=12, fontweight="bold")
+    ax.set_aspect("equal")
+    ax.grid(alpha=0.12)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_xlim(-1, 11)
+    ax.set_ylim(27, 14)
+
+
+def _draw_macro_surface_data(
+    ax: plt.Axes,
+    wrapper: SteanePlusSurfaceCode,
+    *,
+    operation: str | None = None,
+    highlight: set[tuple[int, int]] | None = None,
+) -> None:
+    highlight = highlight or set()
+    for coord, label in _macro_surface_data(wrapper).items():
+        selected = coord in highlight
+        ax.scatter(
+            *coord,
+            s=105 if selected else 72,
+            color="#0f766e" if selected else "#2b6cb0",
+            edgecolor="white",
+            linewidth=1.2,
+            zorder=5,
+        )
+        ax.annotate(label, coord, xytext=(4, 4), textcoords="offset points", fontsize=7.5)
+        if operation is not None:
+            ax.annotate(
+                operation,
+                coord,
+                xytext=(0, -16),
+                textcoords="offset points",
+                ha="center",
+                fontsize=7.5,
+                color="#173b57",
+                fontweight="bold",
+            )
+
+
+def _draw_macro_surface_checks(
+    ax: plt.Axes,
+    wrapper: SteanePlusSurfaceCode,
+    *,
+    family: str | None = None,
+    highlight_top: bool = False,
+) -> None:
+    """Draw each complete surface check once as a collapsed support."""
+    for coord, measurement in wrapper.surface_syndrome_measurements.items():
+        kind = "X" if measurement.__class__.__name__.startswith("SurfaceX") else "Z"
+        if family is not None and kind != family:
+            continue
+        support = surface_support(measurement)
+        is_top = coord in {(2, 16), (6, 16)}
+        color = "#d1495b" if kind == "X" else "#68a357"
+        if highlight_top and is_top:
+            color = "#7b2cbf"
+        if len(support) >= 3:
+            center = np.mean(np.asarray(support), axis=0)
+            ordered = sorted(support, key=lambda p: np.arctan2(p[1] - center[1], p[0] - center[0]))
+            ax.add_patch(
+                Polygon(
+                    ordered,
+                    closed=True,
+                    facecolor=color,
+                    edgecolor=color,
+                    alpha=0.24,
+                    linewidth=2 if highlight_top and is_top else 1.1,
+                )
+            )
+        else:
+            ax.plot(
+                [support[0][0], support[1][0]],
+                [support[0][1], support[1][1]],
+                color=color,
+                linewidth=10 if highlight_top and is_top else 7,
+                alpha=0.42,
+                solid_capstyle="round",
+            )
+        ax.scatter(*coord, marker="P" if is_top else "s", s=95 if is_top else 44, color=color, edgecolor="white", zorder=6)
+        ax.text(coord[0], coord[1], kind, fontsize=7, ha="center", va="center", zorder=7)
+        if highlight_top and is_top:
+            name = "Xab q23" if coord == (2, 16) else "Xcd q53"
+            ax.annotate(name, coord, xytext=(-17, 15), textcoords="offset points", fontsize=8, fontweight="bold")
+            for data in support:
+                ax.annotate(
+                    "",
+                    xy=data,
+                    xytext=coord,
+                    arrowprops={
+                        "arrowstyle": "-|>",
+                        "color": "#7b2cbf",
+                        "lw": 2.5,
+                        "mutation_scale": 22,
+                        "shrinkA": 8,
+                        "shrinkB": 7,
+                    },
+                    zorder=4,
+                )
+    ax.text(
+        0.5,
+        0.025,
+        "each shaded support = reset + all CXs + readout\n"
+        "X ancilla→data; Z data→ancilla",
+        transform=ax.transAxes,
+        ha="center",
+        va="bottom",
+        fontsize=7.5,
+        color="#444444",
+    )
+
+
+def plot_grouped_pre_interface(
+    wrapper: SteanePlusSurfaceCode,
+    *,
+    probe: str = "+",
+    detector_overlay: bool = False,
+) -> plt.Figure:
+    """Plot every pre-interface operation family once, collapsing code expansion."""
+    if probe not in ("+", "0"):
+        raise ValueError("probe must be '+' or '0'")
+    fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+
+    ax = axes[0, 0]
+    _setup_macro_surface_axis(ax, "Macro-tick P — prepare surface data only")
+    _draw_macro_surface_data(ax, wrapper, operation="RX")
+    ax.text(5, 26.1, r"Prepare the distance-5 surface patch in $|+⟩^{\otimes 25}$", ha="center", fontsize=9)
+
+    ax = axes[0, 1]
+    _setup_macro_surface_axis(ax, "Macro-tick S0 — first full surface-check round")
+    _draw_macro_surface_data(ax, wrapper)
+    _draw_macro_surface_checks(ax, wrapper)
+    if detector_overlay:
+        ax.scatter(2, 18, s=260, facecolor="none", edgecolor="#111111", linewidth=3, zorder=9)
+        ax.scatter(2, 18, s=80, marker="*", color="#dc2626", zorder=10)
+        ax.annotate(
+            "q24: m5\nstarts D16\nB1: X after initial q24 RZ",
+            (2, 18),
+            xytext=(30, 12),
+            textcoords="offset points",
+            fontsize=8.5,
+            color="#111111",
+            fontweight="bold",
+            arrowprops={"arrowstyle": "->", "color": "#111111", "lw": 1.5},
+        )
+
+    ax = axes[0, 2]
+    ax.axis("off")
+    ax.set_title("Macro-tick D0 — initial detector boundary only", fontsize=12, fontweight="bold")
+    ax.text(
+        0.5,
+        0.62,
+        "Initially satisfied X checks:\n" r"$D_X=m_X^{(0)}$",
+        transform=ax.transAxes,
+        ha="center",
+        va="center",
+        fontsize=16,
+    )
+    ax.text(
+        0.5,
+        0.32,
+        "Each first Z-check outcome is retained as the\nbaseline for its next temporal detector.",
+        transform=ax.transAxes,
+        ha="center",
+        fontsize=12,
+    )
+    ax.text(0.5, 0.12, "DETECTOR instructions do not remeasure qubits.", transform=ax.transAxes, ha="center", fontsize=10, color="#555555")
+
+    ax = axes[1, 0]
+    ax.set_title("Macro-tick C — perfect Steane preparation", fontsize=12, fontweight="bold")
+    ax.set_aspect("equal")
+    ax.set_xlim(0, 7)
+    ax.set_ylim(17, 9)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    reset_x = {"0", "1", "2", "3"} if probe == "+" else {"1", "2", "3"}
+    for coord, raw_label in STEANE_COORDS.items():
+        label = raw_label.removeprefix("St")
+        if label.startswith("2'"):
+            continue
+        basis = "RX" if label in reset_x else "RZ"
+        ax.scatter(*coord, s=105, color="#d1495b", edgecolor="white", zorder=4)
+        ax.annotate(label, coord, xytext=(4, 4), textcoords="offset points", fontsize=8)
+        ax.annotate(basis, coord, xytext=(0, -17), textcoords="offset points", ha="center", fontsize=8, fontweight="bold")
+    ax.text(3.5, 16.7, rf"Prepare perfect Steane $|{probe}_L\rangle$", ha="center", fontsize=11, fontweight="bold")
+    ax.text(3.5, 9.4, "The ideal Clifford encoder is one collapsed code-expansion operation.", ha="center", fontsize=9)
+
+    ax = axes[1, 1]
+    _setup_macro_surface_axis(ax, "Macro-tick T — enter the merged boundary")
+    _draw_macro_surface_data(ax, wrapper)
+    for coord, name in [((2, 16), "pause Xab"), ((6, 16), "pause Xcd")]:
+        ax.scatter(*coord, marker="x", s=180, color="#b91c1c", linewidth=3, zorder=6)
+        ax.annotate(name, coord, xytext=(-18, 17), textcoords="offset points", fontsize=9, fontweight="bold", color="#991b1b")
+    ax.text(5, 26.0, "Builder transition only: these two checks stop before interface round 1", ha="center", fontsize=9)
+
+    ax = axes[1, 2]
+    ax.axis("off")
+    ax.set_title("Pre-interface coverage", fontsize=12, fontweight="bold")
+    ax.text(
+        0.5,
+        0.56,
+        "P → S0 → D0 → C → T → interface round 1",
+        transform=ax.transAxes,
+        ha="center",
+        va="center",
+        fontsize=14,
+        fontweight="bold",
+    )
+    ax.text(
+        0.5,
+        0.30,
+        "Every pre-interface quantum or detector operation is assigned once.\n"
+        "Only the internal perfect Steane encoder is intentionally collapsed.",
+        transform=ax.transAxes,
+        ha="center",
+        fontsize=11,
+    )
+
+    fig.suptitle(
+        "Before Hirano interface round 1 — complete barrier-collapsed operation atlas",
+        fontsize=15,
+        fontweight="bold",
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    return fig
+
+
+def plot_grouped_post_interface(
+    wrapper: SteanePlusSurfaceCode,
+    *,
+    probe: str = "+",
+    full_post_selection: bool = False,
+) -> plt.Figure:
+    """Plot every post-interface operation family once for one circuit branch."""
+    if probe not in ("+", "0"):
+        raise ValueError("probe must be '+' or '0'")
+    fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+
+    ax = axes[0, 0]
+    _setup_macro_surface_axis(ax, "Macro-tick R1 — first post-interface surface round")
+    _draw_macro_surface_data(ax, wrapper)
+    _draw_macro_surface_checks(ax, wrapper, highlight_top=True)
+    ax.text(5, 15.0, "q23 performs the next-in-time Xab extraction; q53 starts Xcd", ha="center", fontsize=9)
+
+    ax = axes[0, 1]
+    ax.axis("off")
+    ax.set_title("Macro-tick D1 — recovery detector relations only", fontsize=12, fontweight="bold")
+    ax.text(
+        0.5,
+        0.67,
+        r"$D_{X_{ab}}=m_{ab}^{\rm demolition}\oplus m_{ab}^{\rm recovery}$",
+        transform=ax.transAxes,
+        ha="center",
+        fontsize=16,
+    )
+    ax.text(
+        0.5,
+        0.45,
+        r"$X_{cd}$: first recovery value seeds its future detector record",
+        transform=ax.transAxes,
+        ha="center",
+        fontsize=12,
+    )
+    ax.text(
+        0.5,
+        0.25,
+        r"Other checks: $D_s=m_s^{\rm interface\ end}\oplus m_s^{\rm recovery}$",
+        transform=ax.transAxes,
+        ha="center",
+        fontsize=12,
+    )
+    ax.text(0.5, 0.09, "This panel contains classical DETECTOR instructions, not extra measurements.", transform=ax.transAxes, ha="center", fontsize=10, color="#555555")
+
+    ax = axes[0, 2]
+    _setup_macro_surface_axis(
+        ax,
+        "Macro-ticks R2–R5 — four decoded surface rounds"
+        if not full_post_selection
+        else "Macro-ticks R2–R5 — omitted in full-postselection branch",
+    )
+    if full_post_selection:
+        ax.axis("off")
+        ax.text(0.5, 0.5, "No additional decoded rounds", transform=ax.transAxes, ha="center", fontsize=15, fontweight="bold")
+    else:
+        _draw_macro_surface_data(ax, wrapper)
+        _draw_macro_surface_checks(ax, wrapper)
+        ax.text(5, 15.0, "×4 complete rounds; every check result is compared to the preceding round", ha="center", fontsize=9, fontweight="bold")
+
+    final_basis = "MX" if probe == "+" else "MZ"
+    closed_family = "X" if probe == "+" else "Z"
+    ax = axes[1, 0]
+    _setup_macro_surface_axis(ax, f"Macro-tick M — destructive {final_basis} data readout")
+    _draw_macro_surface_data(ax, wrapper, operation=final_basis)
+    ax.text(5, 26.0, f"Measure all 25 surface data qubits in the {closed_family} basis", ha="center", fontsize=9)
+
+    ax = axes[1, 1]
+    ax.axis("off")
+    ax.set_title(
+        f"Macro-tick F — compare stored checks with final {closed_family}-data parity",
+        fontsize=12,
+        fontweight="bold",
+    )
+    ax.text(
+        0.5,
+        0.94,
+        "M HAS ALREADY MEASURED THE DATA • F IS CLASSICAL XOR ONLY",
+        transform=ax.transAxes,
+        ha="center",
+        fontsize=10.5,
+        fontweight="bold",
+        color="#991b1b",
+    )
+
+    def classical_box(x: float, y: float, label: str, *, color: str = "#173b57") -> None:
+        ax.text(
+            x,
+            y,
+            label,
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=9,
+            color=color,
+            bbox={
+                "boxstyle": "round,pad=0.35",
+                "facecolor": "#f8fafc",
+                "edgecolor": color,
+                "linewidth": 1.5,
+            },
+        )
+
+    def classical_arrow(x0: float, y0: float, x1: float, y1: float) -> None:
+        ax.annotate(
+            "",
+            xy=(x1, y1),
+            xytext=(x0, y0),
+            xycoords=ax.transAxes,
+            arrowprops={"arrowstyle": "-|>", "lw": 1.7, "color": "#64748b", "mutation_scale": 16},
+        )
+
+    if probe == "+":
+        first_stored = "stored q23 bit\nlast Xab check"
+        first_final = "bits from M\nMX(a) ⊕ MX(b)"
+        first_detector = r"$D_{X_{ab}}$"
+        first_formula = r"$D_{X_{ab}}=m_{X_{ab}}^{\rm last}\oplus m_a^{\rm final}\oplus m_b^{\rm final}$"
+        second_stored = "stored ancilla bit\nlast weight-4 X check"
+        second_final = "bits from M\nMX on its 4 data qubits"
+    else:
+        first_stored = "stored ancilla bit\nlast boundary Z check"
+        first_final = "bits from M\nMZ on its 2 data qubits"
+        first_detector = r"$D_{Z,\rm boundary}$"
+        first_formula = r"$D_Z=m_Z^{\rm last}\oplus m_{d_1}^{\rm final}\oplus m_{d_2}^{\rm final}$"
+        second_stored = "stored ancilla bit\nlast weight-4 Z check"
+        second_final = "bits from M\nMZ on its 4 data qubits"
+
+    classical_box(0.25, 0.79, first_stored)
+    classical_box(0.25, 0.66, first_final)
+    classical_box(0.62, 0.725, "XOR", color="#7b2cbf")
+    classical_box(0.86, 0.725, first_detector, color="#2f855a")
+    classical_arrow(0.37, 0.79, 0.55, 0.735)
+    classical_arrow(0.37, 0.66, 0.55, 0.715)
+    classical_arrow(0.68, 0.725, 0.80, 0.725)
+    ax.text(0.5, 0.55, first_formula, transform=ax.transAxes, ha="center", fontsize=10.5)
+
+    classical_box(0.25, 0.40, second_stored)
+    classical_box(0.25, 0.27, second_final)
+    classical_box(0.62, 0.335, "XOR", color="#7b2cbf")
+    classical_box(0.86, 0.335, r"$D_{\rm check}$", color="#2f855a")
+    classical_arrow(0.37, 0.40, 0.55, 0.345)
+    classical_arrow(0.37, 0.27, 0.55, 0.325)
+    classical_arrow(0.68, 0.335, 0.80, 0.335)
+    ax.text(
+        0.5,
+        0.17,
+        r"same rule for weight 4: stored check bit $\oplus$ final parity of its four data bits",
+        transform=ax.transAxes,
+        ha="center",
+        fontsize=10,
+    )
+    ax.text(
+        0.5,
+        0.055,
+        "Why F comes after M: it consumes M's recorded bits.\nIt never touches the already measured qubits.",
+        transform=ax.transAxes,
+        ha="center",
+        fontsize=9.5,
+        fontweight="bold",
+        color="#555555",
+    )
+
+    ax = axes[1, 2]
+    _setup_macro_surface_axis(ax, "Macro-tick L0 — logical observable parity only")
+    logical_surface = (
+        {(1, 17 + 2 * row) for row in range(wrapper.surface_distance)}
+        if probe == "+"
+        else {(1 + 2 * col, 17) for col in range(wrapper.surface_distance)}
+    )
+    _draw_macro_surface_data(ax, wrapper, highlight=logical_surface)
+    if probe == "+":
+        formula = r"$L_0=\bigoplus_{q\in\mathrm{first\ column}}m_q^X\oplus m_1\oplus m_4\oplus m_6$"
+        source = "green: destructive surface-X support; Steane terms were recorded in demolition"
+    else:
+        formula = r"$L_0=\bigoplus_{q\in\mathrm{top\ row}}m_q^Z\oplus\bigoplus_j m_{ZZ,j}^{\rm interface}$"
+        source = "green: destructive surface-Z support; ZZ terms were recorded at the interface boundary"
+    ax.text(5, 25.9, formula, ha="center", fontsize=11)
+    ax.text(5, 15.0, source, ha="center", fontsize=8.5)
+
+    branch = "full postselection" if full_post_selection else "decoded-surface"
+    fig.suptitle(
+        f"After Hirano interface round 3 — complete {branch} operation atlas ({probe} probe)",
+        fontsize=15,
+        fontweight="bold",
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    return fig
+
+
+def plot_d16_d46_d77_spacetime(wrapper: SteanePlusSurfaceCode) -> plt.Figure:
+    """Locate the zero-probe temporal-corner witness on macro-S geometry."""
+    support = [(1, 17), (3, 17), (1, 19), (3, 19)]
+    center = np.mean(np.asarray(support), axis=0)
+    ordered = sorted(support, key=lambda p: np.arctan2(p[1] - center[1], p[0] - center[0]))
+    panels = [
+        ("before interface: S0", "m5", "starts D16", "B1: X after q24 RZ"),
+        ("interface round 1: S", "m29", "closes D16; starts D46", "A1: X after q24 RZ"),
+        ("interface round 2: S", "m61", "closes D46; starts D77", "A2: X after q24 RZ"),
+        ("interface round 3: S + I", "m100", "closes D77", "B2: X on a after CX a→q23"),
+    ]
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10), sharex=True, sharey=True)
+    for index, (ax, (title, record, edge, fault)) in enumerate(zip(axes.ravel(), panels)):
+        _setup_macro_surface_axis(ax, title)
+        ax.set_xlim(-0.5, 4.5)
+        ax.set_ylim(20.3, 14.5)
+        for coord in support:
+            label = (surface_data_label(coord) or str(coord)).removeprefix("Su-")
+            ax.scatter(*coord, s=85, color="#2b6cb0", edgecolor="white", zorder=5)
+            ax.annotate(label, coord, xytext=(4, 4), textcoords="offset points", fontsize=8)
+        ax.add_patch(
+            Polygon(
+                ordered,
+                closed=True,
+                facecolor="#d9f0d3",
+                edgecolor="#2f855a",
+                alpha=0.58,
+                linewidth=2.2,
+            )
+        )
+        ax.scatter(2, 18, marker="s", s=165, color="#79c267", edgecolor="#111111", linewidth=2.5, zorder=8)
+        ax.text(2, 18, "Z", ha="center", va="center", fontsize=9, fontweight="bold", zorder=9)
+        ax.annotate(
+            f"q24@(2,18): {record}\n{edge}",
+            (2, 18),
+            xytext=(48, -7),
+            textcoords="offset points",
+            ha="left",
+            fontsize=8.5,
+            fontweight="bold",
+        )
+        fault_coord = (2, 18) if index < 3 else (1, 17)
+        ax.scatter(*fault_coord, marker="*", s=140, color="#dc2626", edgecolor="white", linewidth=0.8, zorder=10)
+        ax.annotate(
+            fault,
+            fault_coord,
+            xytext=(0, 70) if index < 3 else (-72, 58),
+            textcoords="offset points",
+            ha="center" if index < 3 else "left",
+            fontsize=8.5,
+            color="#b91c1c",
+            fontweight="bold",
+        )
+        if index == 3:
+            # Exact interface CNOT direction for the competing B2 fault.
+            ax.scatter(2, 16, marker="P", s=135, color="#7b61a8", edgecolor="white", zorder=8)
+            ax.annotate("q23: Z1a-R", (2, 16), xytext=(9, 7), textcoords="offset points", fontsize=8, fontweight="bold")
+            ax.annotate(
+                "",
+                xy=(2, 16),
+                xytext=(1, 17),
+                arrowprops={"arrowstyle": "-|>", "color": "#2f855a", "lw": 2.8, "mutation_scale": 23, "shrinkA": 7, "shrinkB": 8},
+                zorder=7,
+            )
+        ax.text(
+            0.5,
+            0.02,
+            "q24 support: a, b, r1c0, r1c1",
+            transform=ax.transAxes,
+            ha="center",
+            va="bottom",
+            fontsize=7.8,
+            color="#444444",
+        )
+
+    fig.suptitle(
+        "Where D16, D46, and D77 live: three time edges of one surface-Z check\n"
+        "red stars mark the two indistinguishable two-fault histories A and B",
+        fontsize=14,
+        fontweight="bold",
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.91))
+    return fig
 
 
 def _active_qubits(circuit: stim.Circuit) -> set[int]:
