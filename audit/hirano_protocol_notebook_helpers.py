@@ -290,9 +290,11 @@ def interface_repetition_one_macro_table() -> pd.DataFrame:
             },
             {
                 "macro-tick": "B",
-                "only operation family shown": "color-ancilla Bell-pair preparation",
-                "checks / actions": "prepare only the 0145, 0235, and 0246 two-ancilla pairs",
-                "relation to executable schedule": "The q2/q2′ gadget is not part of this Bell-pair panel.",
+                "only operation family shown": "color-pair preparation and initial q2/q2′ gates",
+                "checks / actions": (
+                    "prepare the 0145, 0235, and 0246 ancilla pairs; RZ 2′, CX 2→2′, CX 2′→2, RX 2"
+                ),
+                "relation to executable schedule": "Opposed q2/q2′ CNOTs are shown as separate directional arrows.",
             },
             {
                 "macro-tick": "Z",
@@ -312,20 +314,9 @@ def interface_repetition_one_macro_table() -> pd.DataFrame:
             },
             {
                 "macro-tick": "M",
-                "only operation family shown": "color-ancilla disentangling/readout",
-                "checks / actions": "MX/MZ color readouts only",
+                "only operation family shown": "color readout and final q2/q2′ gates",
+                "checks / actions": "MX/MZ color readouts; CX 2→2′, CX 2′→2, MX 2′",
                 "relation to executable schedule": "Readouts are staggered by the released pipeline.",
-            },
-            {
-                "macro-tick": "C",
-                "only operation family shown": "exact q2/q2′ repetition-code conversion route",
-                "checks / actions": (
-                    "RZ 2′; form ZZ=+1; route the two Z contributions; move data to 2′; "
-                    "RX 2; form XX=+1; route the two X contributions; return data to 2; MX 2′"
-                ),
-                "relation to executable schedule": (
-                    "Direct q2/q2′ operations appear only in C. Outlined Z/X entries refer to arrows drawn once in those panels."
-                ),
             },
         ]
     )
@@ -427,15 +418,7 @@ def plot_grouped_hirano_interface_round(
     ]
     check_colors = {"0145": "#d1495b", "0235": "#2b6cb0", "0246": "#6a4c93"}
 
-    if round_number == 1:
-        fig, axes = plt.subplots(2, 4, figsize=(24, 12))
-        grid = axes[0, 3].get_subplotspec().get_gridspec()
-        axes[0, 3].remove()
-        axes[1, 3].remove()
-        q2_route_axis = fig.add_subplot(grid[:, 3])
-    else:
-        fig, axes = plt.subplots(2, 3, figsize=(18, 12))
-        q2_route_axis = None
+    fig, axes = plt.subplots(2, 3, figsize=(18, 12))
 
     def setup_axis(ax: plt.Axes, title: str, *, surface: bool = False) -> None:
         ax.set_title(title, fontsize=12, fontweight="bold")
@@ -670,13 +653,12 @@ def plot_grouped_hirano_interface_round(
         fig.tight_layout(rect=(0, 0, 1, 0.94))
         return fig
 
-    # B owns only the three genuine color-ancilla Bell-pair preparations.
-    # The encoded-data q2/q2' route is kept separate in C below because it
-    # alternates Z- and X-repetition encodings; it is not a Bell ancilla.
+    # B owns the three color-ancilla Bell-pair preparations and the first two
+    # direct q2/q2' CNOTs. The latter are drawn as ordinary directional gates.
     ax = axes[0, 2]
     setup_axis(
         ax,
-        "Macro-tick B — color Bell-pair preparation only"
+        "Macro-tick B — pair preparation / q2↔q2′ gates"
         if round_number == 1
         else "Macro-tick B — color pairs + fresh q2/q2′ Z-copy",
     )
@@ -698,7 +680,30 @@ def plot_grouped_hirano_interface_round(
         )
         midpoint = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
         ax.annotate("CX", midpoint, xytext=(3, -10), textcoords="offset points", fontsize=8)
-    if round_number == 2:
+    if round_number == 1:
+        q2 = (6, 12)
+        q2_prime = (5, 11)
+        for start, end, bend in [
+            (q2, q2_prime, 0.25),
+            (q2_prime, q2, 0.25),
+        ]:
+            ax.annotate(
+                "",
+                xy=end,
+                xytext=start,
+                arrowprops={
+                    "arrowstyle": "-|>",
+                    "color": "#00897b",
+                    "lw": 3,
+                    "mutation_scale": 25,
+                    "shrinkA": 8,
+                    "shrinkB": 8,
+                    "connectionstyle": f"arc3,rad={bend}",
+                },
+            )
+        ax.annotate("RZ", q2_prime, xytext=(-20, 10), textcoords="offset points", fontsize=9, fontweight="bold", color="#00695c")
+        ax.annotate("RX", q2, xytext=(8, -15), textcoords="offset points", fontsize=9, fontweight="bold", color="#00695c")
+    else:
         ax.annotate(
             "",
             xy=(5, 11),
@@ -724,7 +729,7 @@ def plot_grouped_hirano_interface_round(
     ax.text(
         5,
         17.7,
-        "A: RX / later MX     B: RZ / later MZ"
+        "Color ancillas: A is RX; B is RZ"
         if round_number == 1
         else "Color pairs plus source's fresh RZ 2′; CX 2→2′",
         ha="center",
@@ -823,7 +828,7 @@ def plot_grouped_hirano_interface_round(
     ax = axes[1, 2]
     setup_axis(
         ax,
-        "Macro-tick M — color-pair disentangle/readout only"
+        "Macro-tick M — color readout / q2↔q2′ gates"
         if round_number == 1
         else "Macro-tick M — disentangle/read out only",
     )
@@ -848,6 +853,28 @@ def plot_grouped_hirano_interface_round(
         )
         midpoint = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
         ax.annotate("CX", midpoint, xytext=(3, -10), textcoords="offset points", fontsize=8)
+    if round_number == 1:
+        q2 = (6, 12)
+        q2_prime = (5, 11)
+        for start, end, bend in [
+            (q2, q2_prime, -0.25),
+            (q2_prime, q2, -0.25),
+        ]:
+            ax.annotate(
+                "",
+                xy=end,
+                xytext=start,
+                arrowprops={
+                    "arrowstyle": "-|>",
+                    "color": "#00897b",
+                    "lw": 3,
+                    "mutation_scale": 25,
+                    "shrinkA": 8,
+                    "shrinkB": 8,
+                    "connectionstyle": f"arc3,rad={bend}",
+                },
+            )
+        ax.annotate("MX", q2_prime, xytext=(7, 10), textcoords="offset points", fontsize=9, fontweight="bold", color="#00695c")
     ax.text(
         5,
         17.35,
@@ -861,89 +888,10 @@ def plot_grouped_hirano_interface_round(
         fontsize=8.5,
     )
 
-    if round_number == 1:
-        assert q2_route_axis is not None
-        q2_route_axis.axis("off")
-        q2_route_axis.set_title(
-            "Macro-tick C — exact q2/q2′ Z→X repetition route",
-            fontsize=12,
-            fontweight="bold",
-        )
-        q2_route_axis.text(
-            0.5,
-            0.965,
-            "top → bottom is exact source order",
-            transform=q2_route_axis.transAxes,
-            ha="center",
-            va="top",
-            fontsize=9,
-            color="#444444",
-        )
-        route = [
-            ("RZ 2′", "gate"),
-            ("CX 2→2′   ⇒   ZZ=+1\nZ2 and Z2′ carry the same Z information", "state"),
-            ("Z panel:  q2→0235-B", "reference_z"),
-            ("CX 2′→2   ⇒   encoded data moves to q2′", "gate"),
-            ("Z panel:  q2′→0246-B", "reference_z"),
-            ("RX 2   ⇒   |+⟩₂ |ψ⟩₂′", "gate"),
-            ("X panel:  0246-B→q2′", "reference_x"),
-            ("CX 2→2′   ⇒   XX=+1\nX2 and X2′ carry the same X information", "state"),
-            ("X panel:  0235-B→q2", "reference_x"),
-            ("CX 2′→2   ⇒   data returns to q2; q2′=|+⟩", "gate"),
-            ("MX 2′   (postselect +1)", "gate"),
-        ]
-        colors = {
-            "gate": ("#e6fffa", "#00897b"),
-            "state": ("#ccfbf1", "#00695c"),
-            "reference_z": ("#f8fafc", "#475569"),
-            "reference_x": ("#f8fafc", "#475569"),
-        }
-        y_values = np.linspace(0.89, 0.13, len(route))
-        for index, ((label, kind), y) in enumerate(zip(route, y_values)):
-            facecolor, edgecolor = colors[kind]
-            linestyle = "--" if kind.startswith("reference") else "-"
-            q2_route_axis.text(
-                0.5,
-                y,
-                label,
-                transform=q2_route_axis.transAxes,
-                ha="center",
-                va="center",
-                fontsize=8.6 if "\n" not in label else 8.1,
-                fontweight="bold" if kind in {"state", "reference_z", "reference_x"} else "normal",
-                color=(check_colors["0235"] if "0235" in label else check_colors["0246"] if "0246" in label else "#173b57"),
-                bbox={
-                    "boxstyle": "round,pad=0.34",
-                    "facecolor": facecolor,
-                    "edgecolor": edgecolor,
-                    "linestyle": linestyle,
-                    "linewidth": 1.5,
-                },
-            )
-            if index + 1 < len(route):
-                q2_route_axis.annotate(
-                    "",
-                    xy=(0.5, y_values[index + 1] + 0.024),
-                    xytext=(0.5, y - 0.027),
-                    xycoords=q2_route_axis.transAxes,
-                    arrowprops={"arrowstyle": "-|>", "lw": 1.5, "color": "#64748b", "mutation_scale": 15},
-                )
-        q2_route_axis.text(
-            0.5,
-            0.055,
-            "Dashed boxes are cross-references, not duplicate gates:\n"
-            "their CNOT arrows appear once in macro Z or X.",
-            transform=q2_route_axis.transAxes,
-            ha="center",
-            va="center",
-            fontsize=8.7,
-            color="#555555",
-        )
-
     fig.suptitle(
         f"Hirano interface round {round_number}, barrier-collapsed conceptual macro-ticks\n"
         + (
-            "I/S belong to merged-boundary round 1; B/Z/X/M/C own logical color extraction 1, which is source-pipelined."
+            "I/S belong to merged-boundary round 1; B/Z/X/M own logical color extraction 1, which is source-pipelined."
             if round_number == 1
             else "Each panel contains one operation family; panels are not executable hardware TICKs."
         ),

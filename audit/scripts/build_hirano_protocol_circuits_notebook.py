@@ -192,25 +192,19 @@ six executable layers. The macro panels collapse barriers into logical owners:
 | panel | content |
 |---|---|
 | I / S | three interface-Z checks / all compatible surface checks |
-| B | genuine color-ancilla Bell-pair preparation; round 2 also owns the fresh $q_2/q_{2'}$ Z-copy |
+| B | color-pair preparation and the initial $q_2/q_{2'}$ gates; round 2 owns the fresh Z-copy |
 | Z / X | Steane Z/X couplings; the second direct extraction has no X coupling |
-| M | color-ancilla disentangling, readout, and postselected color records |
-| C | round-1 source-order $q_2/q_{2'}$ route: $ZZ=+1$ repetition, data move, then $XX=+1$ repetition and return |
+| M | color-ancilla disentangling/readout and the final $q_2/q_{2'}$ gates |
 | D / A / P | round-3 Steane demolition, q23 $X_{ab}$, and derived parities |
 
 Round 1 uses `Z1a-R`, round 2 uses `Z1a-L`, and round 3 returns to
 `Z1a-R`. The ordinary $X_{ab},X_{cd}$ recovery begins only afterward.
 
-The tall round-1 C panel is chronological. Solid boxes own the direct
-$q_2/q_{2'}$ gates; dashed boxes merely point to the one matching CNOT arrow in
-Z or X. In the released source the split is $q_2\to0235$-B and
-$q_{2'}\to0246$-B for Z, then $0246$-B$\to q_{2'}$ and
-$0235$-B$\to q_2$ for X.
-
 Every source operation is assigned once. Complete checks and pipelined logical
 extractions are collapsed; the panels preserve gate ownership and CNOT
-direction, not hardware barriers. Black rings and red stars mark the Section-3
-detector witness."""
+direction, not hardware barriers. The opposed teal arrows in round-1 B and M
+are the emitted $q_2/q_{2'}$ CNOTs. Black rings and red stars mark the
+Section-3 detector witness."""
     ),
     code(
         """for round_number in (1, 2, 3):
